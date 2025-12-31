@@ -1,5 +1,5 @@
 ## 说明
-无聊折腾，UI使用了(PYQT5)[https://github.com/zhiyiYo/PyQt-Fluent-Widgets],环境请安装**Python**，一时出来的项目当然不会做的特别完善，需要的请自行修改使用。
+无聊折腾，UI使用了[PyQt-Fluent-Widgets](https://github.com/zhiyiYo/PyQt-Fluent-Widgets)，环境请安装**Python**，一时出来的项目当然不会做的特别完善，需要的请自行修改使用。
 
 ## 项目文件说明
 
