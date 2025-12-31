@@ -7,12 +7,12 @@
 - `ssh_manager.py` - SSH连接管理，负责和服务器建立连接
 - `terminal_interface.py` - SSH终端界面，就是那个命令行窗口
 - `terminal_tab_interface.py` - 多标签页管理，可以同时开多个终端窗口
-- `sftp_interface.py` - 文件传输功能，可以直接拖拽上传下载文件
+- `sftp_interface.py` - 文件sftp功能
 - `server_config.py` - 服务器配置管理，保存服务器信息的
 - `server_interface.py` - 服务器列表界面，管理服务器的地方
 - `settings_interface.py` - 设置界面，可以改主题背景啥的
-- `title_bar.py` - 自定义标题栏，让窗口看起来更像Windows 11
-- `servers.json` - 服务器配置文件，保存的服务器信息都在这里
+- `title_bar.py` - 自定义标题栏
+- `servers.json` - 服务器配置文件，保存的服务器信息都在这里(第一次需要生成)
 - `requirements.txt` - 依赖库列表
 - `author_card.py` - 关于作者的界面
 
@@ -61,12 +61,7 @@ pyinstaller -F -w -i 1.jpg main.py
 
 ## 特点
 
-- 现代化的UI界面，类似Windows 11风格
-- 支持多标签页SSH终端
-- SFTP文件传输
-- 服务器配置管理
-- 支持主题切换
-- 支持背景图片设置
+-自行查看
 
 ## 附加
 可随意修改并发布
