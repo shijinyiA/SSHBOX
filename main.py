@@ -1,10 +1,10 @@
 """SSH终端管理器 - 主程序"""
 import sys
 import os
-from PyQt5.QtCore import Qt, QMargins
+from PyQt5.QtCore import Qt, QMargins, QPoint
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QWidget, 
                             QHBoxLayout, QStackedWidget, QSplitter)
-from PyQt5.QtGui import QFontDatabase, QFont, QPalette, QBrush, QPixmap, QPainter, QColor, QPen, QPainterPath
+from PyQt5.QtGui import QFontDatabase, QFont, QPalette, QBrush, QPixmap, QPainter, QColor, QPen, QPainterPath, QCursor
 from qfluentwidgets import (NavigationInterface, NavigationItemPosition, 
                            setThemeColor, InfoBar, InfoBarPosition)
 from qfluentwidgets import FluentIcon as FIF
@@ -28,7 +28,7 @@ class MainWindow(QMainWindow):
         
         self.setWindowTitle('锦衣的SSH工具箱')
         self.setGeometry(100, 100, 1400, 900)
-        self.setMinimumSize(1000, 700)
+        self.setMinimumSize(400, 300)
         
         self.terminal_manager = None
         
@@ -202,6 +202,143 @@ class MainWindow(QMainWindow):
         bg_path = self.setting_interface.load_background_config()
         if bg_path:
             self.set_background(bg_path)
+    
+    def mousePressEvent(self, event):
+        """鼠标按下事件 - 用于窗口拖拽和大小调整"""
+        if event.button() == Qt.LeftButton:
+            # 获取鼠标位置相对于窗口的坐标
+            pos = event.pos()
+            # 检查是否在窗口边缘（8像素范围内）
+            if self.is_on_resize_border(pos):
+                self.resizing = True
+                self.resize_direction = self.get_resize_direction(pos)
+                self.last_pos = event.globalPos()
+            else:
+                self.resizing = False
+                # 如果不在边缘，则允许标题栏拖拽窗口
+                super().mousePressEvent(event)
+    
+    def mouseMoveEvent(self, event):
+        """鼠标移动事件 - 处理窗口大小调整"""
+        pos = event.pos()
+        if not hasattr(self, 'resizing'):
+            self.resizing = False
+            
+        if self.resizing and self.resize_direction:
+            # 计算鼠标移动距离
+            delta = event.globalPos() - self.last_pos
+            self.resize_window(delta)
+            self.last_pos = event.globalPos()
+        # 无论是否在调整大小，都要根据位置更新光标
+        # 根据鼠标位置更新光标形状
+        if self.is_on_resize_border(pos):
+            cursor_shape = self.get_cursor_for_position(pos)
+            self.setCursor(cursor_shape)
+        else:
+            self.setCursor(QCursor(Qt.ArrowCursor))
+                
+        super().mouseMoveEvent(event)
+    
+    def mouseReleaseEvent(self, event):
+        """鼠标释放事件"""
+        if event.button() == Qt.LeftButton:
+            self.resizing = False
+            self.resize_direction = None
+            # 恢复默认光标
+            self.setCursor(QCursor(Qt.ArrowCursor))
+        super().mouseReleaseEvent(event)
+    
+    def is_on_resize_border(self, pos):
+        """检查鼠标是否在窗口边缘"""
+        width, height = self.width(), self.height()
+        border_size = 8  # 边缘检测区域大小
+        
+        return (pos.x() < border_size or pos.x() > width - border_size or
+                pos.y() < border_size or pos.y() > height - border_size)
+    
+    def get_resize_direction(self, pos):
+        """获取调整方向"""
+        width, height = self.width(), self.height()
+        border_size = 8
+        
+        left = pos.x() < border_size
+        right = pos.x() > width - border_size
+        top = pos.y() < border_size
+        bottom = pos.y() > height - border_size
+        
+        if left and top:
+            return 'top_left'
+        elif right and top:
+            return 'top_right'
+        elif left and bottom:
+            return 'bottom_left'
+        elif right and bottom:
+            return 'bottom_right'
+        elif left:
+            return 'left'
+        elif right:
+            return 'right'
+        elif top:
+            return 'top'
+        elif bottom:
+            return 'bottom'
+        else:
+            return None
+    
+    def get_cursor_for_position(self, pos):
+        """根据位置返回适当的光标形状"""
+        width, height = self.width(), self.height()
+        border_size = 8
+        
+        left = pos.x() < border_size
+        right = pos.x() > width - border_size
+        top = pos.y() < border_size
+        bottom = pos.y() > height - border_size
+        
+        if (left and top) or (right and bottom):
+            return QCursor(Qt.SizeFDiagCursor)
+        elif (right and top) or (left and bottom):
+            return QCursor(Qt.SizeBDiagCursor)
+        elif left or right:
+            return QCursor(Qt.SizeHorCursor)
+        elif top or bottom:
+            return QCursor(Qt.SizeVerCursor)
+        else:
+            return QCursor(Qt.ArrowCursor)
+    
+    def resize_window(self, delta):
+        """调整窗口大小"""
+        if not self.resize_direction:
+            return
+            
+        current_geometry = self.geometry()
+        new_x, new_y = current_geometry.x(), current_geometry.y()
+        new_width, new_height = current_geometry.width(), current_geometry.height()
+        
+        min_width, min_height = self.minimumWidth(), self.minimumHeight()
+        if min_width <= 0:
+            min_width = 400
+        if min_height <= 0:
+            min_height = 300
+        
+        if 'left' in self.resize_direction:
+            new_width -= delta.x()
+            new_x += delta.x()
+        elif 'right' in self.resize_direction:
+            new_width += delta.x()
+            
+        if 'top' in self.resize_direction:
+            new_height -= delta.y()
+            new_y += delta.y()
+        elif 'bottom' in self.resize_direction:
+            new_height += delta.y()
+        
+        # 限制最小尺寸
+        new_width = max(new_width, min_width)
+        new_height = max(new_height, min_height)
+        
+        # 应用新尺寸和位置
+        self.setGeometry(new_x, new_y, new_width, new_height)
 
 
 if __name__ == '__main__':

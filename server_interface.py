@@ -39,7 +39,7 @@ class ServerListWidget(QWidget):
         
         # 标题
         title = SubtitleLabel('服务器管理', self)
-        title.setStyleSheet("font-size: 18px; font-weight: bold;")
+        title.setStyleSheet("font-size: 18px; font-weight: bold;background-color: #00000000;")
         layout.addWidget(title)
         
         # 操作按钮区域
@@ -72,7 +72,7 @@ class ServerListWidget(QWidget):
         self.server_list = ListWidget(self)
         self.server_list.setStyleSheet("""
             QListWidget {
-                background-color: white;
+                background-color: rgba(255, 255, 255, 0.5);
                 color: black;
                 border: 1px solid #e0e0e0;
                 border-radius: 8px;
