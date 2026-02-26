@@ -8,7 +8,7 @@ from typing import Optional, Callable, List, Tuple
 import paramiko
 from PyQt5.QtCore import QObject, pyqtSignal, QThread
 
-from server_config import ServerConfig
+from config import ServerConfig
 
 
 class SSHClient(QObject):

@@ -59,8 +59,8 @@ class AuthorCard(CardWidget):
         
         # 主布局
         main_layout = QHBoxLayout(self)
-        main_layout.setContentsMargins(20, 20, 20, 20)
-        main_layout.setSpacing(20)
+        main_layout.setContentsMargins(15, 15, 15, 15)
+        main_layout.setSpacing(15)
         
         # 左侧文字区域
         text_layout = QVBoxLayout()

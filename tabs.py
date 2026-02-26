@@ -4,9 +4,9 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QInputDialog,
 from qfluentwidgets import (FluentIcon as FIF, InfoBar, InfoBarPosition, 
                            CardWidget, PushButton)
 
-from server_config import ServerConfig
-from terminal_interface import SSHTerminalInterface
-from sftp_interface import SFTPFileInterface
+from config import ServerConfig
+from terminal import SSHTerminalInterface
+from sftp import SFTPFileInterface
 
 
 class TerminalTabWidget(QWidget):
@@ -17,7 +17,6 @@ class TerminalTabWidget(QWidget):
         self.terminals = {}
         self.is_closing = False
         self.setup_ui()
-        self.update_theme()
     
     def setup_ui(self):
         layout = QVBoxLayout(self)
@@ -42,29 +41,6 @@ class TerminalTabWidget(QWidget):
         self.tab_widget.tabCloseRequested.connect(self.close_terminal)
         self.tab_widget.tabBarDoubleClicked.connect(self.rename_terminal)
         layout.addWidget(self.tab_widget)
-    
-    def update_theme(self):
-        self.tab_widget.setStyleSheet("""
-            QTabWidget::pane {
-                border: 1px solid #e0e0e0;
-                background-color: #ffffff;
-            }
-            QTabBar::tab {
-                background-color: #f3f3f3;
-                color: #000000;
-                padding: 8px 16px;
-                margin-right: 2px;
-                border-top-left-radius: 4px;
-                border-top-right-radius: 4px;
-            }
-            QTabBar::tab:selected {
-                background-color: #0078d4;
-                color: #ffffff;
-            }
-            QTabBar::tab:hover {
-                background-color: #e5e5e5;
-            }
-        """)
     
     def request_new_terminal(self):
         InfoBar.info("提示", "请从服务器列表选择要连接的服务器", parent=self,

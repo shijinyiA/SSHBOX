@@ -22,12 +22,12 @@ class TitleBarButton(QPushButton):
                     font-size: 10px;
                 }
                 QPushButton:hover {
-                    background-color: #e81123;
-                    color: white;
+                    background-color: rgba(128, 128, 128, 0.3);
+                    color: black;
                 }
                 QPushButton:pressed {
-                    background-color: #f1707a;
-                    color: white;
+                    background-color: rgba(128, 128, 128, 0.5);
+                    color: black;
                 }
             """)
             self.setText("\uE8BB")
@@ -102,7 +102,7 @@ class CustomTitleBar(QWidget):
         self.icon_label = QLabel()
         self.icon_label.setFixedSize(20, 20)
         self.icon_label.setScaledContents(True)
-        icon_path = os.path.join(os.path.dirname(__file__), "1.jpg")
+        icon_path = os.path.join(os.path.dirname(__file__), "1.ico")
         if os.path.exists(icon_path):
             pixmap = QPixmap(icon_path)
             self.icon_label.setPixmap(pixmap)

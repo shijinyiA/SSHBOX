@@ -1,21 +1,23 @@
 """SSH终端管理器 - 主程序"""
 import sys
 import os
-from PyQt5.QtCore import Qt, QMargins, QPoint
+import time
+from PyQt5.QtCore import Qt, QMargins, QPoint, QTimer
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QWidget, 
-                            QHBoxLayout, QStackedWidget, QSplitter)
-from PyQt5.QtGui import QFontDatabase, QFont, QPalette, QBrush, QPixmap, QPainter, QColor, QPen, QPainterPath, QCursor
+                            QHBoxLayout, QStackedWidget, QSplitter, QGraphicsBlurEffect, QLabel,
+                            QGraphicsScene, QGraphicsPixmapItem)
+from PyQt5.QtGui import QFontDatabase, QFont, QPalette, QBrush, QPixmap, QPainter, QColor, QPen, QPainterPath, QCursor, QImage
 from qfluentwidgets import (NavigationInterface, NavigationItemPosition, 
                            setThemeColor, InfoBar, InfoBarPosition)
 from qfluentwidgets import FluentIcon as FIF
 
-from server_config import ServerConfig
-from server_interface import ServerListWidget
-from terminal_interface import SSHTerminalInterface
-from terminal_tab_interface import TerminalTabWidget
-from sftp_interface import SFTPFileInterface
-from settings_interface import SettingInterface
-from title_bar import CustomTitleBar
+from config import ServerConfig
+from servers import ServerListWidget
+from terminal import SSHTerminalInterface
+from tabs import TerminalTabWidget
+from sftp import SFTPFileInterface
+from settings import SettingInterface
+from title import CustomTitleBar
 
 
 class MainWindow(QMainWindow):
@@ -23,16 +25,29 @@ class MainWindow(QMainWindow):
         super().__init__()
         
         # 设置无边框窗口和圆角效果
-        self.setWindowFlags(Qt.FramelessWindowHint | Qt.Window)
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.Window | Qt.WindowMinMaxButtonsHint)
         self.setAttribute(Qt.WA_TranslucentBackground, True)
         
-        self.setWindowTitle('锦衣的SSH工具箱')
-        self.setGeometry(100, 100, 1400, 900)
-        self.setMinimumSize(400, 300)
+        self.setWindowTitle('SSH工具箱')
+        self.setGeometry(100, 100, 1280, 720)
+        self.setMinimumSize(800, 600)
+        
+        # 启用鼠标跟踪，以便在没有按下鼠标按钮时也能接收鼠标移动事件
+        self.setMouseTracking(True)
         
         self.terminal_manager = None
+        self._last_warning_time = 0
+        self._resize_timer = None
+        self._pending_bg_update = False
+        
+        # 创建背景标签
+        self.background_label = QLabel(self)
+        self.background_label.setGeometry(0, 0, 0, 0)
+        self.background_label.lower()
+        self.background_label.setAttribute(Qt.WA_TransparentForMouseEvents)
         
         self.central_widget = QWidget()
+        self.central_widget.setMouseTracking(True)
         self.setCentralWidget(self.central_widget)
         
         self.root_layout = QVBoxLayout(self.central_widget)
@@ -43,31 +58,38 @@ class MainWindow(QMainWindow):
         self.root_layout.addWidget(self.title_bar)
         
         self.main_container = QWidget()
+        self.main_container.setMouseTracking(True)
         self.main_layout = QHBoxLayout(self.main_container)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
         self.main_layout.setSpacing(0)
         self.root_layout.addWidget(self.main_container)
         
         self.navigation_interface = NavigationInterface(self, showMenuButton=True)
+        self.navigation_interface.setMinimumWidth(200)
+        self.navigation_interface.setMaximumWidth(250)
         self.main_layout.addWidget(self.navigation_interface)
         
         self.content_widget = QWidget()
+        self.content_widget.setMouseTracking(True)
         self.content_layout = QVBoxLayout(self.content_widget)
         self.content_layout.setContentsMargins(10, 10, 10, 10)
         
         self.stack_widget = QStackedWidget()
+        self.stack_widget.setMouseTracking(True)
         self.content_layout.addWidget(self.stack_widget)
         
         self.server_interface = ServerListWidget()
+        self.server_interface.setMouseTracking(True)
         self.server_interface.connectRequested.connect(self.connect_to_server)
         self.stack_widget.addWidget(self.server_interface)
         
         self.terminal_manager = TerminalTabWidget()
+        self.terminal_manager.setMouseTracking(True)
         self.terminal_manager.disconnected.connect(self.on_all_terminals_closed)
         self.stack_widget.addWidget(self.terminal_manager)
         
         self.setting_interface = SettingInterface(self)
-        self.setting_interface.themeChanged.connect(self.on_theme_changed)
+        self.setting_interface.setMouseTracking(True)
         self.setting_interface.backgroundChanged.connect(self.on_background_changed)
         self.stack_widget.addWidget(self.setting_interface)
         
@@ -85,13 +107,13 @@ class MainWindow(QMainWindow):
         painter.setRenderHint(QPainter.Antialiasing)
         painter.setRenderHint(QPainter.SmoothPixmapTransform)
         
-        # 绘制圆角背景
+        # 绘制圆角背景 - 使用半透明白色
         rect = self.rect().marginsRemoved(QMargins(1, 1, 1, 1))
         path = QPainterPath()
         path.addRoundedRect(rect.x(), rect.y(), rect.width(), rect.height(), 12, 12)  # 12像素圆角
         
-        # 使用白色背景
-        painter.fillPath(path, QColor(255, 255, 255))
+        # 使用半透明白色背景（90%不透明度）
+        painter.fillPath(path, QColor(255, 255, 255, 230))
         
         # 绘制边框 - 使用更浅的颜色或完全移除
         # painter.setPen(QPen(QColor(200, 200, 200), 2))
@@ -164,13 +186,6 @@ class MainWindow(QMainWindow):
         self.stack_widget.setCurrentWidget(self.server_interface)
         self.navigation_interface.setCurrentItem('servers')
             
-    def on_theme_changed(self, theme):
-        # 更新标题栏主题
-        self.title_bar.update_theme()
-        # 更新终端标签页主题
-        if self.terminal_manager:
-            self.terminal_manager.update_theme()
-    
     def on_background_changed(self, path: str):
         """处理背景更改"""
         self.set_background(path)
@@ -178,17 +193,42 @@ class MainWindow(QMainWindow):
     def set_background(self, image_path: str):
         """设置背景图片"""
         if image_path and os.path.exists(image_path):
-            palette = QPalette()
+            # 加载图片
             pixmap = QPixmap(image_path)
             # 缩放图片以适应窗口
             scaled_pixmap = pixmap.scaled(self.size(), Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
-            palette.setBrush(QPalette.Window, QBrush(scaled_pixmap))
-            self.central_widget.setAutoFillBackground(True)
-            self.central_widget.setPalette(palette)
+            
+            # 获取模糊程度
+            blur_value = self.setting_interface.get_blur_value()
+            
+            # 如果需要模糊，应用模糊效果
+            if blur_value > 0:
+                # 创建场景和项目
+                scene = QGraphicsScene()
+                item = QGraphicsPixmapItem(scaled_pixmap)
+                scene.addItem(item)
+                
+                # 创建模糊效果
+                blur = QGraphicsBlurEffect()
+                blur.setBlurRadius(blur_value * 0.5)  # 将0-100映射到0-50
+                item.setGraphicsEffect(blur)
+                
+                # 渲染场景到图片
+                result = QImage(scaled_pixmap.size(), QImage.Format_ARGB32)
+                result.fill(Qt.transparent)
+                painter = QPainter(result)
+                scene.render(painter)
+                painter.end()
+                
+                # 转换回QPixmap
+                scaled_pixmap = QPixmap.fromImage(result)
+            
+            # 设置到背景标签
+            self.background_label.setPixmap(scaled_pixmap)
+            self.background_label.setGeometry(0, 0, self.width(), self.height())
         else:
             # 清除背景
-            self.central_widget.setAutoFillBackground(False)
-            self.central_widget.setPalette(QPalette())
+            self.background_label.clear()
     
     def load_background(self):
         """加载背景图片配置"""
@@ -199,6 +239,35 @@ class MainWindow(QMainWindow):
     def resizeEvent(self, event):
         """窗口大小改变时重新设置背景"""
         super().resizeEvent(event)
+        
+        # 检查窗口是否太小
+        min_width = 800
+        min_height = 600
+        if self.width() < min_width or self.height() < min_height:
+            current_time = time.time()
+            if current_time - self._last_warning_time > 2:
+                self._last_warning_time = current_time
+                InfoBar.warning(
+                    title='窗口太小了喵！！',
+                    content=f'建议窗口大小至少为 {min_width}x{min_height}',
+                    orient=Qt.Horizontal,
+                    isClosable=True,
+                    position=InfoBarPosition.TOP,
+                    duration=3000,
+                    parent=self
+                )
+        
+        # 使用定时器延迟更新背景，避免频繁重绘导致掉帧
+        if self._resize_timer:
+            self._resize_timer.stop()
+        
+        self._resize_timer = QTimer(self)
+        self._resize_timer.setSingleShot(True)
+        self._resize_timer.timeout.connect(self._update_background)
+        self._resize_timer.start(100)  # 100ms后更新背景
+    
+    def _update_background(self):
+        """延迟更新背景"""
         bg_path = self.setting_interface.load_background_config()
         if bg_path:
             self.set_background(bg_path)
@@ -213,10 +282,11 @@ class MainWindow(QMainWindow):
                 self.resizing = True
                 self.resize_direction = self.get_resize_direction(pos)
                 self.last_pos = event.globalPos()
+                event.accept()
             else:
+                # 如果不在边缘，不处理拖拽，让标题栏处理
                 self.resizing = False
-                # 如果不在边缘，则允许标题栏拖拽窗口
-                super().mousePressEvent(event)
+                event.ignore()
     
     def mouseMoveEvent(self, event):
         """鼠标移动事件 - 处理窗口大小调整"""
@@ -229,15 +299,15 @@ class MainWindow(QMainWindow):
             delta = event.globalPos() - self.last_pos
             self.resize_window(delta)
             self.last_pos = event.globalPos()
-        # 无论是否在调整大小，都要根据位置更新光标
-        # 根据鼠标位置更新光标形状
-        if self.is_on_resize_border(pos):
-            cursor_shape = self.get_cursor_for_position(pos)
-            self.setCursor(cursor_shape)
+            event.accept()
         else:
-            self.setCursor(QCursor(Qt.ArrowCursor))
-                
-        super().mouseMoveEvent(event)
+            # 根据鼠标位置更新光标形状
+            if self.is_on_resize_border(pos):
+                cursor_shape = self.get_cursor_for_position(pos)
+                self.setCursor(cursor_shape)
+            else:
+                self.setCursor(Qt.ArrowCursor)
+            event.accept()
     
     def mouseReleaseEvent(self, event):
         """鼠标释放事件"""
@@ -245,13 +315,15 @@ class MainWindow(QMainWindow):
             self.resizing = False
             self.resize_direction = None
             # 恢复默认光标
-            self.setCursor(QCursor(Qt.ArrowCursor))
-        super().mouseReleaseEvent(event)
+            self.setCursor(Qt.ArrowCursor)
+            event.accept()
+        else:
+            event.ignore()
     
     def is_on_resize_border(self, pos):
         """检查鼠标是否在窗口边缘"""
         width, height = self.width(), self.height()
-        border_size = 8  # 边缘检测区域大小
+        border_size = 12  # 增加边缘检测区域大小
         
         return (pos.x() < border_size or pos.x() > width - border_size or
                 pos.y() < border_size or pos.y() > height - border_size)
@@ -259,7 +331,7 @@ class MainWindow(QMainWindow):
     def get_resize_direction(self, pos):
         """获取调整方向"""
         width, height = self.width(), self.height()
-        border_size = 8
+        border_size = 12
         
         left = pos.x() < border_size
         right = pos.x() > width - border_size
@@ -288,7 +360,7 @@ class MainWindow(QMainWindow):
     def get_cursor_for_position(self, pos):
         """根据位置返回适当的光标形状"""
         width, height = self.width(), self.height()
-        border_size = 8
+        border_size = 12
         
         left = pos.x() < border_size
         right = pos.x() > width - border_size
@@ -296,15 +368,15 @@ class MainWindow(QMainWindow):
         bottom = pos.y() > height - border_size
         
         if (left and top) or (right and bottom):
-            return QCursor(Qt.SizeFDiagCursor)
+            return Qt.SizeFDiagCursor
         elif (right and top) or (left and bottom):
-            return QCursor(Qt.SizeBDiagCursor)
+            return Qt.SizeBDiagCursor
         elif left or right:
-            return QCursor(Qt.SizeHorCursor)
+            return Qt.SizeHorCursor
         elif top or bottom:
-            return QCursor(Qt.SizeVerCursor)
+            return Qt.SizeVerCursor
         else:
-            return QCursor(Qt.ArrowCursor)
+            return Qt.ArrowCursor
     
     def resize_window(self, delta):
         """调整窗口大小"""

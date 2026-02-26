@@ -10,7 +10,7 @@ from qfluentwidgets import (PushButton, LineEdit, SubtitleLabel, BodyLabel,
                                    PrimaryPushButton, CardWidget, MessageBox,
                                    ProgressBar, Action, RoundMenu)
 
-from ssh_manager import SSHClient, FileTransferWorker
+from ssh import SSHClient, FileTransferWorker
 
 
 def format_size(size: int) -> str:
@@ -107,15 +107,73 @@ class FileTreeWidget(QTreeWidget):
         if not items:
             return
         
-        # 获取选中的文件信息
-        for item in items:
-            if item.data(0, Qt.UserRole + 1):  # 是目录
-                continue
-            
-            remote_path = item.data(0, Qt.UserRole)
-            file_name = item.text(0)
-            self.downloadRequested.emit(remote_path, file_name)
-            break
+        # 只处理单个文件的拖拽
+        if len(items) > 1:
+            InfoBar.warning("提示", "一次只能拖拽一个文件", parent=self.window(),
+                           position=InfoBarPosition.TOP)
+            return
+        
+        item = items[0]
+        is_dir = item.data(0, Qt.UserRole + 1)
+        
+        # 只允许拖拽文件，不允许拖拽目录
+        if is_dir:
+            InfoBar.warning("提示", "不支持拖拽文件夹，请使用右键菜单下载", parent=self.window(),
+                           position=InfoBarPosition.TOP)
+            return
+        
+        remote_path = item.data(0, Qt.UserRole)
+        file_name = item.text(0)
+        
+        # 创建MimeData
+        mime_data = QMimeData()
+        
+        # 创建一个临时文件路径用于拖拽
+        import tempfile
+        temp_dir = tempfile.gettempdir()
+        temp_file_path = os.path.join(temp_dir, file_name)
+        
+        # 创建一个空的临时文件
+        with open(temp_file_path, 'w') as f:
+            pass
+        
+        # 将临时文件路径添加到MimeData
+        url = QUrl.fromLocalFile(temp_file_path)
+        mime_data.setUrls([url])
+        
+        # 存储远程路径信息，用于后续下载
+        mime_data.setText(remote_path)
+        
+        # 创建拖拽对象
+        drag = QDrag(self)
+        drag.setMimeData(mime_data)
+        
+        # 设置拖拽图标
+        pixmap = item.icon(0).pixmap(32, 32)
+        drag.setPixmap(pixmap)
+        drag.setHotSpot(QPoint(pixmap.width() // 2, pixmap.height() // 2))
+        
+        # 执行拖拽
+        result = drag.exec_(Qt.CopyAction)
+        
+        # 删除临时文件
+        try:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+        except:
+            pass
+        
+        # 如果拖拽成功（用户将文件拖到了某个位置），则弹出保存对话框
+        if result == Qt.CopyAction:
+            # 弹出保存对话框
+            local_path, _ = QFileDialog.getSaveFileName(
+                self, "保存文件", file_name, "所有文件 (*)"
+            )
+            if local_path:
+                # 触发下载
+                self.downloadRequested.emit(remote_path, file_name)
+                # 手动调用下载，因为downloadRequested信号不会自动传递local_path
+                self.start_download(remote_path, local_path)
     
     def show_context_menu(self, position: QPoint):
         """显示右键菜单"""
@@ -479,7 +537,7 @@ class SFTPFileInterface(QWidget):
     
     def on_download_requested(self, remote_path: str, file_name: str):
         """处理下载请求"""
-        # 选择保存位置
+        # 选择保存位置，默认使用文件名
         local_path, _ = QFileDialog.getSaveFileName(
             self, "保存文件", file_name, "所有文件 (*)"
         )

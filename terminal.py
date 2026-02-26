@@ -7,8 +7,8 @@ from qfluentwidgets import (PushButton, LineEdit, SubtitleLabel, BodyLabel,
                            InfoBar, InfoBarPosition, FluentIcon as FIF,
                            PrimaryPushButton, CardWidget)
 
-from server_config import ServerConfig
-from ssh_manager import SSHClient, SSHWorker, SSHConnectWorker, SystemInfoWorker
+from config import ServerConfig
+from ssh import SSHClient, SSHWorker, SSHConnectWorker, SystemInfoWorker
 
 
 class TerminalWidget(QTextEdit):

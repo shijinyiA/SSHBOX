@@ -1,11 +1,11 @@
-from PyQt5.QtCore import pyqtSignal
+from PyQt5.QtCore import pyqtSignal, Qt
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, 
                             QTableWidgetItem, QHeaderView, QAbstractItemView, 
                             QMenu, QAction, QMessageBox, QListWidget, QListWidgetItem)
 from qfluentwidgets import (CardWidget, PushButton, FluentIcon as FIF, 
                            SubtitleLabel, PrimaryPushButton, ListWidget, ToolButton)
 
-from server_config import ServerConfig, load_servers, save_servers
+from config import ServerConfig, load_servers, save_servers
 
 
 class ServerListWidgetItem(QListWidgetItem):
@@ -29,7 +29,6 @@ class ServerListWidget(QWidget):
         super().__init__(parent)
         self.servers = load_servers()
         self.setup_ui()
-        self.update_theme()
         self.load_server_list()
     
     def setup_ui(self):
@@ -39,7 +38,7 @@ class ServerListWidget(QWidget):
         
         # 标题
         title = SubtitleLabel('服务器管理', self)
-        title.setStyleSheet("font-size: 18px; font-weight: bold;background-color: #00000000;")
+        title.setStyleSheet("font-size: 18px; font-weight: bold;")
         layout.addWidget(title)
         
         # 操作按钮区域
@@ -72,7 +71,7 @@ class ServerListWidget(QWidget):
         self.server_list = ListWidget(self)
         self.server_list.setStyleSheet("""
             QListWidget {
-                background-color: rgba(255, 255, 255, 0.5);
+                background-color: rgba(255, 255, 255, 0.8);
                 color: black;
                 border: 1px solid #e0e0e0;
                 border-radius: 8px;
@@ -106,15 +105,6 @@ class ServerListWidget(QWidget):
         
         layout.addWidget(self.server_list)
     
-    def update_theme(self):
-        # 更新主题样式
-        self.setStyleSheet("""
-            QWidget {
-                background-color: white;
-                color: black;
-            }
-        """)
-    
     def load_server_list(self):
         self.server_list.clear()
         
@@ -131,7 +121,7 @@ class ServerListWidget(QWidget):
         self.connect_btn.setEnabled(has_selection)
     
     def add_server(self):
-        from server_config import ServerConfigDialog
+        from config import ServerConfigDialog
         dialog = ServerConfigDialog(self)
         if dialog.exec_() == dialog.Accepted:
             config = dialog.get_config()
@@ -144,7 +134,7 @@ class ServerListWidget(QWidget):
         current_item = self.server_list.currentItem()
         if current_item:
             server = current_item.data(0x0100)  # 获取服务器配置数据
-            from server_config import ServerConfigDialog
+            from config import ServerConfigDialog
             dialog = ServerConfigDialog(self, server)
             if dialog.exec_() == dialog.Accepted:
                 updated_config = dialog.get_config()
